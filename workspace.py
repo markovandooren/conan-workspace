@@ -39,8 +39,14 @@ class Editable:
         self.path = path
         self.layout = layout
 
+    def to_string_reference(self):
+        result = self.package.name + '/' +self.package.main_semantic_version() + '.' +  self.package.main_revision()
+        if (self.package.main_user()):
+            result = result + '@' + self.package.main_user() + "/" + self.package.main_channel()
+        return result
+
     def disable(self):
-        subprocess.run('conan', 'editable', 'remove', self.package.name + '/' + self.package.main_revision())
+        subprocess.run('conan', 'editable', 'remove', self.to_string_reference())
 
 class Package:
     def __init__(self, name, workspace):
@@ -82,6 +88,10 @@ class Package:
         editables = self.workspace.editables()
         return editables[self.name] if self.name in editables else None
 
+    def edit(self):
+        ref = self.workspace.main_references[self.name].to_string()
+        subprocess.run(['conan', 'editable', 'add', self.directory(), ref], stdout=subprocess.PIPE, cwd=self.workspace.root)
+
 class PackageReference:
 
     @classmethod
@@ -106,6 +116,12 @@ class PackageReference:
         self.revision = revision
         self.user = user
         self.channel = channel
+
+    def to_string(self) -> str:
+        result = self.name + '/' +self.semantic_version + '.' +  self.revision
+        if (self.user):
+            result = result + '@' + self.user + "/" + self.channel
+        return result
 
 class Workspace:
     def __init__(self, main, root):
@@ -232,11 +248,13 @@ class Workspace:
 def main():
     parser = argparse.ArgumentParser(description='Manage a feature branch workspace.')
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
-    parser_bump = subparsers.add_parser('bump', help='bump help')
+    parser_bump = subparsers.add_parser('peg', help='peg the revision of a package or all packages')
     parser_bump.add_argument('project', nargs='?')
     parser_download = subparsers.add_parser('download', help='download help')
-    parser_download.add_argument('project')
+    parser_download.add_argument('package')
     parser.add_argument('-m', '--main', type=str, required=False)
+    parser_edit = subparsers.add_parser('edit', help='make a package editable')
+    parser_edit.add_argument('package')
 
     args = parser.parse_args()
     workspace = Workspace(args.main, os.getcwd())
@@ -244,13 +262,16 @@ def main():
     for key, value in workspace.editables().items():
         print("Editable for " + key)
 
-    if (args.command == 'bump'):
+    if (args.command == 'peg'):
         project = workspace.main
         if(args.project and len(args.project) == 1):
             project = args.project[0]
         print('Bumping packaging revisions.')
         workspace.commit_and_propagate_hashes()
     elif (args.command == 'download'):
-        workspace.download(args.project)
+        workspace.download(args.package)
+        workspace.package(args.package).edit()
+    elif (args.command == 'edit'):
+        workspace.package(args.package).edit()
 
 main()
