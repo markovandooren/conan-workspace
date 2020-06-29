@@ -15,11 +15,11 @@ class PackageDescriptor:
         self.pref = value["pref"]
 
     def name(self):
-        match = re.search('(.+)/', self.pref)
+        match = re.search('([^@]+)/', self.pref)
         return match.group(1)
 
     def revision(self):
-        match = re.search('/.*\.([a-z0-9]*)', self.pref)
+        match = re.search('/[^@]*\.([a-z0-9]*)', self.pref)
         return match.group(1)
 
     def user(self):
@@ -49,7 +49,7 @@ class Package:
         return self.git_revision()
 
     def main_revision(self):
-        return self.workspace.main_references[self.name].name
+        return self.workspace.main_references[self.name].revision
 
     def git_revision(self):
         hash = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory())
@@ -109,8 +109,14 @@ class Workspace:
                 pkg = PackageDescriptor(value)
                 name = pkg.name()
                 graph.add_node(name)
-                references[pkg.name()] = PackageReference(pkg.name(), pkg.revision(), pkg.user(), pkg.channel())
-                print("Found package " + name + " with revision " + pkg.revision())
+                revision = pkg.revision()
+                user = pkg.user()
+                channel = pkg.channel()
+                references[name] = PackageReference(name, revision, user, channel)
+                msg = "Found package " + name + " with revision: " + pkg.revision()
+                if (user) : msg = msg + " user: " + user + " channel: " + channel
+                print(msg)
+
 
             for index, value in packages.items():
                 pkg = PackageDescriptor(value)
