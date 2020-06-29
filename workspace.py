@@ -5,6 +5,7 @@ import re
 import subprocess
 import argparse
 import yaml
+from pathlib import Path
 
 class PackageDescriptor:
     def __init__(self, value):
@@ -12,27 +13,34 @@ class PackageDescriptor:
             self.deps = value["requires"]
         else:
             self.deps = []
-        self.pref = value["pref"]
+        self.package_reference = PackageReference.from_string(value["pref"])
 
     def name(self):
-        match = re.search('([^@]+)/', self.pref)
-        return match.group(1)
+        return self.package_reference.name
+
+    def semantic_version(self):
+        return self.package_reference.semantic_version
 
     def revision(self):
-        match = re.search('/[^@]*\.([a-z0-9]*)', self.pref)
-        return match.group(1)
+        return self.package_reference.revision
 
     def user(self):
-        match = re.search('@([a-zA-Z]*)', self.pref)
-        return match.group(1) if match else None
+        return self.package_reference.user
 
     def channel(self):
-        match = re.search('@[a-zA-Z]*/([a-zA-Z]*)', self.pref)
-        return match.group(1) if match else None
+        return self.package_reference.channel
 
     def dependencies(self):
         return [] + self.deps
 
+class Editable:
+    def __init__(self, package, path, layout):
+        self.package = package
+        self.path = path
+        self.layout = layout
+
+    def disable(self):
+        subprocess.run('conan', 'editable', 'remove', self.package.name + '/' + self.package.main_revision())
 
 class Package:
     def __init__(self, name, workspace):
@@ -48,8 +56,17 @@ class Package:
         commit = subprocess.run(['git', 'commit', '-m', 'Version bump'], stdout=subprocess.PIPE, cwd=directory)
         return self.git_revision()
 
+    def main_semantic_version(self):
+        return self.workspace.main_references[self.name].semantic_version
+
     def main_revision(self):
         return self.workspace.main_references[self.name].revision
+
+    def main_user(self):
+        return self.workspace.main_references[self.name].user
+
+    def main_channel(self):
+        return self.workspace.main_references[self.name].channel
 
     def git_revision(self):
         hash = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory())
@@ -58,9 +75,34 @@ class Package:
     def is_downloaded(self):
         return os.path.exists(os.path.join(self.workspace.root, self.name))
 
+    def is_editable(self):
+        return self.name in self.workspace.editables()
+
+    def editable(self) -> Editable:
+        editables = self.workspace.editables()
+        return editables[self.name] if self.name in editables else None
+
 class PackageReference:
-    def __init__(self, name, revision, user, channel):
+
+    @classmethod
+    def from_string(self, reference_string):
+        name_match = re.search('([^@]+)/', reference_string)
+        name = name_match.group(1)
+
+        revision_match = re.search('/([^@]*)\.([a-z0-9]*)', reference_string)
+        semantic_version = revision_match.group(1)
+        revision = revision_match.group(2)
+
+        user_match = re.search('@([a-zA-Z]*)', reference_string)
+        user = user_match.group(1) if user_match else None
+
+        channel_match = re.search('@[a-zA-Z]*/([a-zA-Z]*)', reference_string)
+        channel = channel_match.group(1) if channel_match else None
+        return PackageReference(name, semantic_version, revision, user, channel)
+
+    def __init__(self, name, semantic_version, revision, user, channel):
         self.name = name
+        self.semantic_version = semantic_version
         self.revision = revision
         self.user = user
         self.channel = channel
@@ -109,10 +151,11 @@ class Workspace:
                 pkg = PackageDescriptor(value)
                 name = pkg.name()
                 graph.add_node(name)
+                semantic_version = pkg.semantic_version()
                 revision = pkg.revision()
                 user = pkg.user()
                 channel = pkg.channel()
-                references[name] = PackageReference(name, revision, user, channel)
+                references[name] = PackageReference(name, semantic_version, revision, user, channel)
                 msg = "Found package " + name + " with revision: " + pkg.revision()
                 if (user) : msg = msg + " user: " + user + " channel: " + channel
                 print(msg)
@@ -128,9 +171,12 @@ class Workspace:
         return graph, references
 
     def package(self, package_name):
-        if (not self.graph.has_node(package_name)):
+        if (not self.has_package(package_name)):
             raise Exception("The workspace does not have a package named " + package_name)
         return Package(package_name, self)
+
+    def has_package(self, package_name):
+        return self.graph.has_node(package_name)
 
     def package_order(self):
         graph = self.graph
@@ -162,6 +208,26 @@ class Workspace:
             print("Cloning repository " + repo)
             subprocess.run(['git', 'clone', repo, package_name], stdout=subprocess.PIPE, cwd=self.root)
             subprocess.run(['git', 'checkout', package.main_revision()], stdout=subprocess.PIPE, cwd=package.directory())
+            editable = package.editable()
+            if (editable):
+                editable.disable()
+
+    def editables(self):
+        """ Return the editables of this workspace. """
+        result = {}
+        editable_packages_file = os.path.join(Path.home(), ".conan", "editable_packages.json")
+        if (os.path.exists(editable_packages_file)):
+            with open(editable_packages_file) as json_file:
+                editables_dictionary = json.load(json_file)
+                for key, value in editables_dictionary.items():
+                    package_reference = PackageReference.from_string(key)
+                    if (self.has_package(package_reference.name)):
+                        pkg = self.package(package_reference.name)
+                        package_revision = pkg.main_revision()
+                        test = pkg.main_revision() == package_reference.revision
+                        if (pkg.main_semantic_version() ==  package_reference.semantic_version and pkg.main_revision() == package_reference.revision and pkg.main_user() == package_reference.user and pkg.main_channel() == package_reference.channel):
+                            result[key] = Editable(pkg, value["path"], value["layout"])
+        return result
 
 def main():
     parser = argparse.ArgumentParser(description='Manage a feature branch workspace.')
@@ -174,6 +240,10 @@ def main():
 
     args = parser.parse_args()
     workspace = Workspace(args.main, os.getcwd())
+
+    for key, value in workspace.editables().items():
+        print("Editable for " + key)
+
     if (args.command == 'bump'):
         project = workspace.main
         if(args.project and len(args.project) == 1):
