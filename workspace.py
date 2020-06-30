@@ -236,11 +236,14 @@ class Workspace:
                         newcontent = re.sub(regex, package_name + r'/\1.' + hash, line)
                         print(newcontent, end="")
                     # Install the package again such that Conan call still work correctly for that package.
-                    subprocess.run(['conan', 'install', '.'], cwd=dependency.directory())
 
     def commit_and_propagate_hashes(self):
-        for package in self.reversed_package_name_order():
-            self.peg(package)
+        for package_name in self.reversed_package_name_order():
+            self.peg(package_name)
+        for package_name in self.reversed_package_name_order():
+            package = self.package(package_name)
+            if (package.is_downloaded()):
+                    subprocess.run(['conan', 'install', '.'], cwd=package.directory())
 
     def download(self, package_name):
         package = self.package(package_name)
