@@ -199,7 +199,7 @@ class Workspace:
         sort = nx.topological_sort(graph)
         return reversed(list(sort))
 
-    def commit_and_propagate_hash(self, package_name):
+    def peg(self, package_name):
         package = self.package(package_name)
         if (package.is_downloaded()):
             import fileinput
@@ -215,7 +215,7 @@ class Workspace:
 
     def commit_and_propagate_hashes(self):
         for package in self.package_order():
-            self.commit_and_propagate_hash(package)
+            self.peg(package)
 
     def download(self, package_name):
         package = self.package(package_name)
