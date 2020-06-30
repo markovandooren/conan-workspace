@@ -240,10 +240,14 @@ class Workspace:
     def commit_and_propagate_hashes(self):
         for package_name in self.reversed_package_name_order():
             self.peg(package_name)
+        # We install the packages again after changing all of the dependencies to
+        # avoid doing it a quadratic number of times.
         for package_name in self.reversed_package_name_order():
             package = self.package(package_name)
             if (package.is_downloaded()):
                     subprocess.run(['conan', 'install', '.'], cwd=package.directory())
+        # In case the workspace object is kept alive, we update the graph.
+        self.update_graph()
 
     def download(self, package_name):
         package = self.package(package_name)
