@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import networkx as nx
 import os
 import json
@@ -315,5 +316,3 @@ def main():
                 revision_string = package.git_revision()
                 msg = msg + " : " + revision_string
             print(msg)
-
-main()
