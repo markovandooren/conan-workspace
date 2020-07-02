@@ -77,8 +77,23 @@ class Package:
         return self.workspace.main_references[self.name]
 
     def git_revision(self):
-        hash = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory())
-        return hash.stdout.rstrip().decode('utf-8')
+        hash = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory()).stdout
+        return hash.rstrip().decode('utf-8')
+
+    def git_branch(self):
+        branch = subprocess.run(['git', 'rev-parse', '--symbolic-full-name', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory())\
+            .stdout.rstrip().decode('utf-8')
+        if (branch == 'HEAD'):
+            return None
+        else:
+            return branch
+
+    def git_local_branches(self):
+        branches = subprocess.run(['git', 'branch', '--list', '--format="%(refname)"'], stdout=subprocess.PIPE, cwd=self.directory())\
+            .stdout.rstrip().decode('utf-8')
+        all = branches.split('\n')
+        result = [branch[1:-1] for branch in all if branch.startswith('"ref')]
+        return result
 
     def is_downloaded(self):
         return os.path.exists(os.path.join(self.workspace.root, self.name))
@@ -93,6 +108,12 @@ class Package:
     def edit(self):
         ref = self.workspace.main_references[self.name].to_string()
         subprocess.run(['conan', 'editable', 'add', self.directory(), ref], stdout=subprocess.PIPE, cwd=self.workspace.root)
+
+    def push(self):
+        subprocess.run(['git', 'push'], cwd=self.directory())
+
+    def checkout(self, revision):
+        subprocess.run(['git', 'checkout', revision], stdout=subprocess.PIPE, cwd=self.directory())
 
 class PackageReference:
 
@@ -238,7 +259,7 @@ class Workspace:
                         print(newcontent, end="")
                     # Install the package again such that Conan call still work correctly for that package.
 
-    def commit_and_propagate_hashes(self):
+    def peg(self):
         for package_name in self.reversed_package_name_order():
             self.peg(package_name)
         # We install the packages again after changing all of the dependencies to
@@ -256,7 +277,7 @@ class Workspace:
             repo = self.git_prefix + package_name + self.git_suffix
             print("Cloning repository " + repo)
             subprocess.run(['git', 'clone', repo, package_name], stdout=subprocess.PIPE, cwd=self.root)
-            subprocess.run(['git', 'checkout', package.main_revision()], stdout=subprocess.PIPE, cwd=package.directory())
+            package.checkout(package.main_revision())
             package.edit()
 
     def editables(self):
@@ -280,6 +301,7 @@ def main():
     parser = argparse.ArgumentParser(description='Manage a feature branch workspace.')
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
     parser_bump = subparsers.add_parser('peg', help='peg the revision of a package or all packages')
+    parser_bump.add_argument('--push', action="store_true")
     parser_bump.add_argument('project', nargs='?')
     parser_download = subparsers.add_parser('download', help='download help')
     parser_download.add_argument('package')
@@ -288,19 +310,22 @@ def main():
     parser_edit.add_argument('package')
     parser_list = subparsers.add_parser('list', help='List all packages in the workspace')
     parser_list.add_argument('--revision', action="store_true")
+    parser_list.add_argument('--branch', action="store_true")
 
     args = parser.parse_args()
     workspace = Workspace(args.main, os.getcwd())
 
-#    for key, value in workspace.editables().items():
-#        print("Editable for " + key)
-
     if (args.command == 'peg'):
         project = workspace.main
-        if(args.project and len(args.project) == 1):
+        if (args.project and len(args.project) == 1):
             project = args.project[0]
         print('Bumping packaging revisions.')
-        workspace.commit_and_propagate_hashes()
+        workspace.peg()
+        if (args.push):
+            for package_name in workspace.reversed_package_name_order():
+                package = workspace.package(package_name)
+                package.push()
+
     elif (args.command == 'download'):
         workspace.download(args.package)
         workspace.package(args.package).edit()
@@ -315,4 +340,13 @@ def main():
             if (args.revision):
                 revision_string = package.git_revision()
                 msg = msg + " : " + revision_string
+            if (args.branch):
+                branch_name = package.git_branch()
+                if (branch_name):
+                    msg = msg + " : " + branch_name
+                else:
+                    msg = msg + " is detached"
             print(msg)
+
+if __name__ == '__main__':
+    main()
