@@ -10,6 +10,9 @@ class Git:
     def commit(self, message):
         subprocess.run(['git', 'commit', '-m', message], stdout=subprocess.PIPE, cwd=self.directory).stdout
 
+    def push(self):
+        subprocess.run(['git', 'push'], cwd=self.directory)
+
     def revision(self):
         hash = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory).stdout.rstrip().decode('utf-8')
         return hash

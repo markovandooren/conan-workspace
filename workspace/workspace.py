@@ -180,30 +180,26 @@ def main():
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
     parser_bump = subparsers.add_parser('peg', help='peg the revision of a package or all packages')
     parser_bump.add_argument('--push', action="store_true")
-    parser_bump.add_argument('project', nargs='?')
     parser_download = subparsers.add_parser('download', help='download help')
     parser_download.add_argument('package')
     parser.add_argument('-m', '--main', type=str, required=False)
-    parser_edit = subparsers.add_parser('edit', help='make a package editable')
-    parser_edit.add_argument('package', nargs='?')
+    parser_edit = subparsers.add_parser('edit', help='Make the specified packages editable. If no packages are provided, all packages in the workspace are made editable.')
+    parser_edit.add_argument('package', nargs='*')
     parser_list = subparsers.add_parser('list', help='List all packages in the workspace')
     parser_list.add_argument('--revision', action="store_true")
     parser_list.add_argument('--branch', action="store_true")
-    parser_close = subparsers.add_parser('close', help='Remove the editables for this workspace.')
+    parser_close = subparsers.add_parser('close', help='Remove the editable for the specified packages. If not packages are provided, the editable is removed for all packages in the workspace.')
+    parser_close.add_argument('package', nargs='*')
 
     args = parser.parse_args()
     workspace = Workspace(args.main, os.getcwd())
 
     if (args.command == 'peg'):
-        project = workspace.main
-        if (args.project and len(args.project) == 1):
-            project = args.project[0]
-        print('Bumping packaging revisions.')
         workspace.peg()
         if (args.push):
             for package_name in workspace.reversed_package_name_order():
                 package = workspace.package(package_name)
-                package.push()
+                package.git.push()
 
     elif (args.command == 'download'):
         workspace.download(args.package)
@@ -231,7 +227,11 @@ def main():
                     msg = msg + " is detached"
             print(msg)
     elif (args.command == 'close'):
-        workspace.close()
+        if not args.package:
+            workspace.close()
+        else:
+            for package_name in args.package:
+                workspace.package(package_name).close()
 
 class PackageDescriptor:
     def __init__(self, value):

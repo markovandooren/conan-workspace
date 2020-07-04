@@ -11,5 +11,5 @@ class Editable:
 
     def edit(self):
         ref = self.package_reference
-        subprocess.run(['conan', 'editable', 'add', self.path, ref.to_string()], stdout=subprocess.PIPE, cwd=self.path)
+        subprocess.run(['conan', 'editable', 'add', self.path, ref.to_string()])
 

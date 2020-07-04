@@ -44,11 +44,13 @@ class Package:
         return editables[self.name] if self.name in editables else None
 
     def edit(self):
-        ref = self.workspace.main_references[self.name].to_string()
-        subprocess.run(['conan', 'editable', 'add', self.directory(), ref], cwd=self.workspace.root)
+        if self.is_downloaded():
+            ref = self.workspace.main_references[self.name].to_string()
+            subprocess.run(['conan', 'editable', 'add', self.directory(), ref], cwd=self.workspace.root)
 
-    def push(self):
-        subprocess.run(['git', 'push'], cwd=self.directory())
+    def close(self):
+        if self.is_editable():
+            self.editable().disable()
 
     def checkout(self, revision):
         subprocess.run(['git', 'checkout', revision], stdout=subprocess.PIPE, cwd=self.directory())
