@@ -1,155 +1,22 @@
 #!/usr/bin/env python
 import networkx as nx
-import os
 import json
-import re
-import subprocess
 import argparse
 import yaml
 from pathlib import Path
 
-class PackageDescriptor:
-    def __init__(self, value):
-        if ("requires" in value):
-            self.deps = value["requires"]
-        else:
-            self.deps = []
-        self.package_reference = PackageReference.from_string(value["pref"])
-
-    def name(self):
-        return self.package_reference.name
-
-    def semantic_version(self):
-        return self.package_reference.semantic_version
-
-    def revision(self):
-        return self.package_reference.revision
-
-    def user(self):
-        return self.package_reference.user
-
-    def channel(self):
-        return self.package_reference.channel
-
-    def dependencies(self):
-        return [] + self.deps
-
-class Editable:
-    def __init__(self, package_reference, path, layout):
-        self.package_reference = package_reference
-        self.path = path
-        self.layout = layout
-
-    def disable(self):
-        subprocess.run('conan', 'editable', 'remove', self.package_reference.to_string())
-
-    def edit(self):
-        ref = self.package_reference
-        subprocess.run(['conan', 'editable', 'add', self.path, ref.to_string()], stdout=subprocess.PIPE, cwd=self.path)
-
-class Package:
-    def __init__(self, name, workspace):
-        self.name = name
-        self.workspace = workspace
-
-    def directory(self):
-        return os.path.join(self.workspace.root, self.name)
-
-    def commit(self):
-        directory = self.directory()
-        subprocess.run(['git', 'add', 'conanfile.py'], stdout=subprocess.PIPE, cwd=directory)
-        commit = subprocess.run(['git', 'commit', '-m', 'Version bump'], stdout=subprocess.PIPE, cwd=directory)
-        return self.git_revision()
-
-    def main_semantic_version(self):
-        return self.workspace.main_references[self.name].semantic_version
-
-    def main_revision(self):
-        return self.workspace.main_references[self.name].revision
-
-    def main_user(self):
-        return self.workspace.main_references[self.name].user
-
-    def main_channel(self):
-        return self.workspace.main_references[self.name].channel
-
-    def main_reference(self):
-        return self.workspace.main_references[self.name]
-
-    def git_revision(self):
-        hash = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory()).stdout
-        return hash.rstrip().decode('utf-8')
-
-    def git_branch(self):
-        branch = subprocess.run(['git', 'rev-parse', '--symbolic-full-name', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE, cwd=self.directory())\
-            .stdout.rstrip().decode('utf-8')
-        if (branch == 'HEAD'):
-            return None
-        else:
-            return branch
-
-    def git_local_branches(self):
-        branches = subprocess.run(['git', 'branch', '--list', '--format="%(refname)"'], stdout=subprocess.PIPE, cwd=self.directory())\
-            .stdout.rstrip().decode('utf-8')
-        all = branches.split('\n')
-        result = [branch[1:-1] for branch in all if branch.startswith('"ref')]
-        return result
-
-    def is_downloaded(self):
-        return os.path.exists(os.path.join(self.workspace.root, self.name))
-
-    def is_editable(self):
-        return self.name in self.workspace.editables()
-
-    def editable(self) -> Editable:
-        editables = self.workspace.editables()
-        return editables[self.name] if self.name in editables else None
-
-    def edit(self):
-        ref = self.workspace.main_references[self.name].to_string()
-        subprocess.run(['conan', 'editable', 'add', self.directory(), ref], stdout=subprocess.PIPE, cwd=self.workspace.root)
-
-    def push(self):
-        subprocess.run(['git', 'push'], cwd=self.directory())
-
-    def checkout(self, revision):
-        subprocess.run(['git', 'checkout', revision], stdout=subprocess.PIPE, cwd=self.directory())
-
-class PackageReference:
-
-    @classmethod
-    def from_string(self, reference_string):
-        name_match = re.search('([^@]+)/', reference_string)
-        name = name_match.group(1)
-
-        revision_match = re.search('/([^@]*)\.([a-z0-9]*)', reference_string)
-        semantic_version = revision_match.group(1)
-        revision = revision_match.group(2)
-
-        user_match = re.search('@([a-zA-Z]*)', reference_string)
-        user = user_match.group(1) if user_match else None
-
-        channel_match = re.search('@[a-zA-Z]*/([a-zA-Z]*)', reference_string)
-        channel = channel_match.group(1) if channel_match else None
-        return PackageReference(name, semantic_version, revision, user, channel)
-
-    def __init__(self, name, semantic_version, revision, user, channel):
-        self.name = name
-        self.semantic_version = semantic_version
-        self.revision = revision
-        self.user = user
-        self.channel = channel
-
-    def to_string(self) -> str:
-        result = self.name + '/' +self.semantic_version + '.' +  self.revision
-        if (self.user):
-            result = result + '@' + self.user + "/" + self.channel
-        return result
-
-    def clone(self):
-        return PackageReference(self.name, self.semantic_version, self.revision, self.user, self.channel)
+from workspace.package import *
+from workspace.editable import *
+from workspace.packagereference import *
 
 class Workspace:
+    """
+    A workspace is consistent when all of the following are true.
+        * forall p in downloaded packages : conan install is successfull
+        * forall p in downloaded packages : p.is_editable() and p.editable.directory == p.directory()
+        * forall p in downloaded packages : p.git.revision() contains p.main_revision()
+        * forall p in downloaded packages : p.git.branch() == main.git.branch()
+    """
     def __init__(self, main, root):
         if (os.path.exists(os.path.join(root, "workspace.yml"))):
             with open(os.path.join(root, "workspace.yml")) as stream:
@@ -228,7 +95,19 @@ class Workspace:
         sort = nx.topological_sort(graph)
         return list(sort)
 
-    def peg(self, package_name):
+    def packages(self):
+        nodes = self.graph.nodes
+        return [ Package(name, self) for name in nodes ]
+
+    def close(self):
+        for name, editable in self.editables().items():
+            editable.disable()
+
+    def edit(self):
+        for package in self.packages():
+            package.edit()
+
+    def peg_package(self, package_name):
         package = self.package(package_name)
         if (package.is_downloaded()):
             import fileinput
@@ -250,7 +129,7 @@ class Workspace:
             # Update the revision in the conanfiles that depend on this package and install their dependencies.
             for dependency_name in nx.ancestors(self.graph, package_name):
                 dependency = self.package(dependency_name)
-                regex = re.compile(package_name + '/(.*)\.([a-z0-9]*)')
+                regex = re.compile(package_name + '/(.*)\.([a-z0-9]{40})')
                 if (dependency.is_downloaded()):
                     # Use the new revision in the conanfile. We substitute regardless of whether it uses it directly.
                     print("Setting requirement revision of " + package_name + " to " + hash + " in " + dependency_name)
@@ -261,7 +140,7 @@ class Workspace:
 
     def peg(self):
         for package_name in self.reversed_package_name_order():
-            self.peg(package_name)
+            self.peg_package(package_name)
         # We install the packages again after changing all of the dependencies to
         # avoid doing it a quadratic number of times.
         for package_name in self.reversed_package_name_order():
@@ -292,9 +171,8 @@ class Workspace:
                     if (self.has_package(package_reference.name)):
                         pkg = self.package(package_reference.name)
                         package_revision = pkg.main_revision()
-                        test = pkg.main_revision() == package_reference.revision
                         if (pkg.main_semantic_version() ==  package_reference.semantic_version and pkg.main_revision() == package_reference.revision and pkg.main_user() == package_reference.user and pkg.main_channel() == package_reference.channel):
-                            result[key] = Editable(pkg.main_reference(), value["path"], value["layout"])
+                            result[pkg.name] = Editable(pkg.main_reference(), value["path"], value["layout"])
         return result
 
 def main():
@@ -307,10 +185,11 @@ def main():
     parser_download.add_argument('package')
     parser.add_argument('-m', '--main', type=str, required=False)
     parser_edit = subparsers.add_parser('edit', help='make a package editable')
-    parser_edit.add_argument('package')
+    parser_edit.add_argument('package', nargs='?')
     parser_list = subparsers.add_parser('list', help='List all packages in the workspace')
     parser_list.add_argument('--revision', action="store_true")
     parser_list.add_argument('--branch', action="store_true")
+    parser_close = subparsers.add_parser('close', help='Remove the editables for this workspace.')
 
     args = parser.parse_args()
     workspace = Workspace(args.main, os.getcwd())
@@ -330,7 +209,11 @@ def main():
         workspace.download(args.package)
         workspace.package(args.package).edit()
     elif (args.command == 'edit'):
-        workspace.package(args.package).edit()
+        if not args.package:
+            workspace.edit()
+        else:
+            for package_name in args.package:
+                workspace.package(package_name).edit()
     elif (args.command == 'list'):
         for package_name in workspace.package_name_order():
             package = workspace.package(package_name)
@@ -338,15 +221,44 @@ def main():
             msg = reference_string
 
             if (args.revision):
-                revision_string = package.git_revision()
+                revision_string = package.git.revision()
                 msg = msg + " : " + revision_string
             if (args.branch):
-                branch_name = package.git_branch()
+                branch_name = package.git.branch()
                 if (branch_name):
                     msg = msg + " : " + branch_name
                 else:
                     msg = msg + " is detached"
             print(msg)
+    elif (args.command == 'close'):
+        workspace.close()
+
+class PackageDescriptor:
+    def __init__(self, value):
+        if ("requires" in value):
+            self.deps = value["requires"]
+        else:
+            self.deps = []
+        self.package_reference = PackageReference.from_string(value["pref"])
+
+    def name(self):
+        return self.package_reference.name
+
+    def semantic_version(self):
+        return self.package_reference.semantic_version
+
+    def revision(self):
+        return self.package_reference.revision
+
+    def user(self):
+        return self.package_reference.user
+
+    def channel(self):
+        return self.package_reference.channel
+
+    def dependencies(self):
+        return [] + self.deps
+
 
 if __name__ == '__main__':
     main()
