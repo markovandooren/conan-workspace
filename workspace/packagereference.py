@@ -19,11 +19,31 @@ class PackageReference:
         return PackageReference(name, semantic_version, revision, user, channel)
 
     def __init__(self, name, semantic_version, revision, user, channel):
-        self.name = name
-        self.semantic_version = semantic_version
-        self.revision = revision
-        self.user = user
-        self.channel = channel
+        self._name = name
+        self._semantic_version = semantic_version
+        self._revision = revision
+        self._user = user
+        self._channel = channel
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def semantic_version(self):
+        return self._semantic_version
+
+    @property
+    def revision(self):
+        return self._revision
+
+    @property
+    def user(self):
+        return self._user
+
+    @property
+    def channel(self):
+        return self._channel
 
     def to_string(self) -> str:
         result = self.name + '/' +self.semantic_version + '.' +  self.revision
