@@ -1,8 +1,6 @@
 import re
+from workspace.contract import *
 
-def require(val, message = ""):
-    if not val:
-        raise Exception(message)
 
 class PackageReference:
     """

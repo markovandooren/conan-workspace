@@ -4,7 +4,7 @@ import json
 import argparse
 import yaml
 from pathlib import Path
-
+from workspace.ui import *
 from workspace.package import *
 from workspace.editable import *
 from workspace.packagereference import *
@@ -246,6 +246,9 @@ def main():
         else:
             for package_name in args.package:
                 workspace.package(package_name).close()
+    else:
+        ui = UI(workspace)
+        ui.run()
 
 class PackageDescriptor:
     def __init__(self, value):
