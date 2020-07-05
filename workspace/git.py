@@ -36,7 +36,10 @@ class Git:
         return int(sequence_in_branch_string)
 
     def local_branches(self):
-        branches = self.git(['branch', '--list', '--format="%(refname)"'])
+        return self.local_branches_of(self.revision())
+
+    def local_branches_of(self, hash):
+        branches = self.git(['branch', '--format="%(refname)"', '--points-at', hash])
         all = branches.split('\n')
-        result = [branch[1:-1] for branch in all if branch.startswith('"ref')]
+        result = [branch[12:-1] for branch in all if branch.startswith('"refs/heads/')]
         return result

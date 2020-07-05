@@ -191,6 +191,7 @@ def main():
     parser_list = subparsers.add_parser('list', help='List all packages in the workspace')
     parser_list.add_argument('--revision', action="store_true")
     parser_list.add_argument('--branch', action="store_true")
+    parser_list.add_argument('--branches', action="store_true")
 
     # Close
     parser_close = subparsers.add_parser('close', help='Remove the editable for the specified packages. If not packages are provided, the editable is removed for all packages in the workspace.')
@@ -225,12 +226,19 @@ def main():
                 sequence_in_branch = package.git.sequence_in_branch()
                 revision_string = package.git.revision()
                 msg = msg + " : " + str(sequence_in_branch) + ' : ' + revision_string
-            if (args.branch):
+            if (args.branch and not args.branches):
                 branch_name = package.git.branch()
                 if (branch_name):
                     msg = msg + " : " + branch_name
                 else:
                     msg = msg + " is detached"
+            if (args.branches):
+                branches = package.git.local_branches()
+                if len(branches) == 0:
+                    msg = msg + " is detached"
+                else:
+                    msg = msg + " : " + (", ".join(branches))
+
             print(msg)
     elif (args.command == 'close'):
         if not args.package:
