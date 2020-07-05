@@ -43,10 +43,14 @@ class Package:
         editables = self.workspace.editables()
         return editables[self.name] if self.name in editables else None
 
-    def edit(self):
+    def edit(self, actual):
         if self.is_downloaded():
-            ref = self.workspace.main_references[self.name].to_string()
-            subprocess.run(['conan', 'editable', 'add', self.directory(), ref], cwd=self.workspace.root)
+            ref = self.workspace.main_references[self.name]
+            if actual:
+                ref = ref.clone(self.git.sequence_in_branch(), self.git.revision())
+            subprocess.run(['conan', 'editable', 'add', self.directory(), ref.to_string()], cwd=self.workspace.root)
+
+
 
     def close(self):
         if self.is_editable():

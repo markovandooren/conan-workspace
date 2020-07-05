@@ -57,26 +57,23 @@ class Workspace:
             packages = data["graph_lock"]["nodes"]
 
             for index, value in packages.items():
-                pkg = PackageDescriptor(value)
-                name = pkg.name()
+                descriptor = PackageDescriptor(value)
+                name = descriptor.name
                 graph.add_node(name)
-                semantic_version = pkg.semantic_version()
-                revision = pkg.revision()
-                user = pkg.user()
-                channel = pkg.channel()
-                references[name] = PackageReference(name, semantic_version, revision, user, channel)
-                #msg = "Found package " + name + " with revision: " + pkg.revision()
-                #if (user) : msg = msg + " user: " + user + " channel: " + channel
-                #print(msg)
-
+                semantic_version = descriptor.semantic_version
+                sequence_in_branch = descriptor.sequence_in_branch
+                revision = descriptor.revision
+                user = descriptor.user
+                channel = descriptor.channel
+                references[name] = PackageReference(name, semantic_version, sequence_in_branch, revision, user, channel)
 
             for index, value in packages.items():
-                pkg = PackageDescriptor(value)
-                dependencies = pkg.dependencies()
+                descriptor = PackageDescriptor(value)
+                dependencies = descriptor.dependencies
                 for dependency in dependencies:
                     dep = packages[dependency]
                     dep_pkg = PackageDescriptor(dep)
-                    graph.add_edge(pkg.name(), dep_pkg.name())
+                    graph.add_edge(descriptor.name, dep_pkg.name)
         return graph, references
 
     def package(self, package_name):
@@ -103,9 +100,9 @@ class Workspace:
         for name, editable in self.editables().items():
             editable.disable()
 
-    def edit(self):
+    def edit(self, actual):
         for package in self.packages():
-            package.edit()
+            package.edit(actual)
 
     def peg_package(self, package_name):
         package = self.package(package_name)
@@ -114,27 +111,26 @@ class Workspace:
 
             # Commit the package and obtain the new revision.
             hash = package.commit()
-
+            sequence_in_branch = package.git.sequence_in_branch()
             # Remove the editable for the old revision.
             editable = package.editable()
             if (editable):
                 editable.disable()
 
             # Add the editable for the new revision.
-            new_package_reference = package.main_reference().clone()
-            new_package_reference.revision = hash
+            new_package_reference = package.main_reference().clone(sequence_in_branch, hash)
             new_editable = Editable(new_package_reference, package.directory(), None)
             new_editable.edit()
 
             # Update the revision in the conanfiles that depend on this package and install their dependencies.
             for dependency_name in nx.ancestors(self.graph, package_name):
                 dependency = self.package(dependency_name)
-                regex = re.compile(package_name + '/(.*)\.([a-z0-9]{40})')
+                regex = re.compile(package_name + '/(.*)\.([0-9]+)\.([a-z0-9]{40})')
                 if (dependency.is_downloaded()):
                     # Use the new revision in the conanfile. We substitute regardless of whether it uses it directly.
                     print("Setting requirement revision of " + package_name + " to " + hash + " in " + dependency_name)
                     for line in fileinput.input(os.path.join(dependency.directory(), "conanfile.py"), inplace=True):
-                        newcontent = re.sub(regex, package_name + r'/\1.' + hash, line)
+                        newcontent = re.sub(regex, package_name + r'/\1.' + str(sequence_in_branch) + '.' + hash, line)
                         print(newcontent, end="")
                     # Install the package again such that Conan call still work correctly for that package.
 
@@ -180,14 +176,23 @@ def main():
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
     parser_bump = subparsers.add_parser('peg', help='peg the revision of a package or all packages')
     parser_bump.add_argument('--push', action="store_true")
+
+    # Download
     parser_download = subparsers.add_parser('download', help='download help')
     parser_download.add_argument('package')
     parser.add_argument('-m', '--main', type=str, required=False)
+
+    # Edit
     parser_edit = subparsers.add_parser('edit', help='Make the specified packages editable. If no packages are provided, all packages in the workspace are made editable.')
     parser_edit.add_argument('package', nargs='*')
+    parser_edit.add_argument('--actual', action="store_true")
+
+    # List
     parser_list = subparsers.add_parser('list', help='List all packages in the workspace')
     parser_list.add_argument('--revision', action="store_true")
     parser_list.add_argument('--branch', action="store_true")
+
+    # Close
     parser_close = subparsers.add_parser('close', help='Remove the editable for the specified packages. If not packages are provided, the editable is removed for all packages in the workspace.')
     parser_close.add_argument('package', nargs='*')
 
@@ -206,10 +211,10 @@ def main():
         workspace.package(args.package).edit()
     elif (args.command == 'edit'):
         if not args.package:
-            workspace.edit()
+            workspace.edit(args.actual)
         else:
             for package_name in args.package:
-                workspace.package(package_name).edit()
+                workspace.package(package_name).edit(args.actual)
     elif (args.command == 'list'):
         for package_name in workspace.package_name_order():
             package = workspace.package(package_name)
@@ -217,8 +222,9 @@ def main():
             msg = reference_string
 
             if (args.revision):
+                sequence_in_branch = package.git.sequence_in_branch()
                 revision_string = package.git.revision()
-                msg = msg + " : " + revision_string
+                msg = msg + " : " + str(sequence_in_branch) + ' : ' + revision_string
             if (args.branch):
                 branch_name = package.git.branch()
                 if (branch_name):
@@ -241,21 +247,31 @@ class PackageDescriptor:
             self.deps = []
         self.package_reference = PackageReference.from_string(value["pref"])
 
+    @property
     def name(self):
         return self.package_reference.name
 
+    @property
     def semantic_version(self):
         return self.package_reference.semantic_version
 
+    @property
+    def sequence_in_branch(self):
+        return self.package_reference.sequence_in_branch
+
+    @property
     def revision(self):
         return self.package_reference.revision
 
+    @property
     def user(self):
         return self.package_reference.user
 
+    @property
     def channel(self):
         return self.package_reference.channel
 
+    @property
     def dependencies(self):
         return [] + self.deps
 
