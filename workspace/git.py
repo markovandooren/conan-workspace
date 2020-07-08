@@ -23,7 +23,10 @@ class Git:
         self.git(['push'])
 
     def revision(self):
-        return self.git(['rev-parse', 'HEAD'])
+        return self.revision_of('HEAD')
+
+    def revision_of(self, branch_name):
+        return self.git(['rev-parse', branch_name])
 
     def branch(self):
         branch = self.git(['rev-parse', '--symbolic-full-name', '--abbrev-ref', 'HEAD'])
