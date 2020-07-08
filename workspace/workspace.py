@@ -18,6 +18,7 @@ class Workspace:
         * forall p in downloaded packages : p.git.branch() == main.git.branch()
     """
     def __init__(self, main, root):
+        self.yaml = None
         if (os.path.exists(os.path.join(root, "workspace.yml"))):
             with open(os.path.join(root, "workspace.yml")) as stream:
                 self.yaml = yaml.safe_load(stream)
@@ -148,11 +149,21 @@ class Workspace:
 
     def download(self, package_name):
         package = self.package(package_name)
-        if (not os.path.exists(os.path.join(package.directory(), ".git"))):
+        if not os.path.exists(os.path.join(package.directory(), ".git")):
+            package.clone()
             repo = self.git_prefix + package_name + self.git_suffix
             print("Cloning repository " + repo)
             subprocess.run(['git', 'clone', repo, package_name], stdout=subprocess.PIPE, cwd=self.root)
-            package.checkout(package.main_revision())
+            main_branch = self.package(self.main).git.branch()
+            if main_branch :
+                local_package_branches = package.git.local_branches()
+                if main_branch in local_package_branches:
+                    package.git.checkout_branch(main_branch)
+                else:
+                    package.git.checkout(package.main_revision())
+                    package.git.create_branch(main_branch)
+            else:
+                package.git.checkout(package.main_revision())
             package.edit()
 
     def editables(self):
@@ -192,6 +203,8 @@ def main():
     parser_list.add_argument('--revision', action="store_true")
     parser_list.add_argument('--branch', action="store_true")
     parser_list.add_argument('--branches', action="store_true")
+    parser_list.add_argument('--upstream', action="store_true")
+    parser_list.add_argument('--remotes', action="store_true")
 
     # Close
     parser_close = subparsers.add_parser('close', help='Remove the editable for the specified packages. If not packages are provided, the editable is removed for all packages in the workspace.')
@@ -233,11 +246,21 @@ def main():
                 else:
                     msg = msg + " is detached"
             if (args.branches):
-                branches = package.git.local_branches()
+                branches = package.git.current_branches()
                 if len(branches) == 0:
                     msg = msg + " is detached"
                 else:
                     msg = msg + " : " + (", ".join(branches))
+            if (args.upstream):
+                upstream_branch_name = package.git.upstream_branch()
+                if (upstream_branch_name):
+                    msg = msg + " : " + upstream_branch_name
+                else:
+                    msg = msg + " has no upstream branch"
+            if (args.remotes):
+                remotes = package.git.remotes()
+                msg = msg + " : " + (". ".join(remotes))
+
 
             print(msg)
     elif (args.command == 'close'):

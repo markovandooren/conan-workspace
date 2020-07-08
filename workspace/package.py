@@ -50,11 +50,6 @@ class Package:
                 ref = ref.clone(self.git.sequence_in_branch(), self.git.revision())
             subprocess.run(['conan', 'editable', 'add', self.directory(), ref.to_string()], cwd=self.workspace.root)
 
-
-
     def close(self):
         if self.is_editable():
             self.editable().disable()
-
-    def checkout(self, revision):
-        subprocess.run(['git', 'checkout', revision], stdout=subprocess.PIPE, cwd=self.directory())

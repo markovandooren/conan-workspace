@@ -9,7 +9,7 @@ class UI:
         self._workspace = workspace
 
     @property
-    def workspace(self) -> Workspace:
+    def workspace(self):
         return self._workspace
 
     def run(self):
