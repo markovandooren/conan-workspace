@@ -40,7 +40,7 @@ class UI:
 
             main_revision = package.main_revision()
             actual_revision = package.git.revision()
-            revision_color = "black" if main_revision == actual_revision else "red"
+            revision_color = "green" if main_revision == actual_revision else "blue"
             actual_revision_label = Label(window, text=actual_revision, font=revision_font, fg=revision_color)
             actual_revision_label.grid(column=2, row=row)
 
