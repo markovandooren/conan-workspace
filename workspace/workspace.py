@@ -107,7 +107,7 @@ class Workspace:
 
     def peg_package(self, package_name):
         package = self.package(package_name)
-        if (package.is_downloaded()):
+        if package.is_downloaded() and package.is_editable():
             import fileinput
 
             # Commit the package and obtain the new revision.
@@ -126,8 +126,8 @@ class Workspace:
             # Update the revision in the conanfiles that depend on this package and install their dependencies.
             for dependency_name in nx.ancestors(self.graph, package_name):
                 dependency = self.package(dependency_name)
-                regex = re.compile(package_name + '/(.*)\.([0-9]+)\.([a-z0-9]{40})')
-                if (dependency.is_downloaded()):
+                if dependency.is_downloaded() and dependency.is_editable():
+                    regex = re.compile(package_name + '/(.*)\.([0-9]+)\.([a-z0-9]{40})')
                     # Use the new revision in the conanfile. We substitute regardless of whether it uses it directly.
                     print("Setting requirement revision of " + package_name + " to " + hash + " in " + dependency_name)
                     for line in fileinput.input(os.path.join(dependency.directory(), "conanfile.py"), inplace=True):
@@ -137,7 +137,7 @@ class Workspace:
 
     def peg(self):
         for package in self.packages():
-            if not package.has_valid_revision():
+            if package.is_editable() and not package.has_valid_revision():
                 raise Exception('Package %s does not have a valid revision.' % package.name)
         for package_name in self.reversed_package_name_order():
             self.peg_package(package_name)
@@ -145,8 +145,8 @@ class Workspace:
         # avoid doing it a quadratic number of times.
         for package_name in self.reversed_package_name_order():
             package = self.package(package_name)
-            if (package.is_downloaded()):
-                    subprocess.run(['conan', 'install', '.'], cwd=package.directory())
+            if package.is_downloaded() and package.is_editable():
+                subprocess.run(['conan', 'install', '.'], cwd=package.directory())
         # In case the workspace object is kept alive, we update the graph.
         self.update_graph()
 
@@ -188,8 +188,8 @@ class Workspace:
 def main():
     parser = argparse.ArgumentParser(description='Manage a feature branch workspace.')
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
-    parser_bump = subparsers.add_parser('peg', help='peg the revision of a package or all packages')
-    parser_bump.add_argument('--push', action="store_true")
+    parser_peg = subparsers.add_parser('peg', help='peg the revision of a package or all packages')
+    parser_peg.add_argument('--push', action="store_true")
 
     # Download
     parser_download = subparsers.add_parser('download', help='download help')
