@@ -3,6 +3,7 @@ import tkinter.ttk
 from tkinter import font
 from workspace.contract import *
 from workspace.workspace import *
+from workspace.tooltip import *
 import subprocess
 
 class PackageView:
@@ -16,6 +17,7 @@ class PackageView:
         self.actual_revision_widget = None
         self.is_downloaded = False
         self.branch_popup = None
+        self.revision_tooltip = None
 
     @property
     def workspace(self):
@@ -91,8 +93,13 @@ class PackageView:
 
             main_revision = package.main_revision()
             actual_revision = package.git.revision()
-            revision_color = 'green' if main_revision == actual_revision else 'blue'
-
+            if main_revision == actual_revision:
+                revision_color = 'green'
+            elif package.has_valid_revision():
+                revision_color = 'blue'
+            else:
+                revision_color = 'red'
+                self.revision_tooltip = ToolTip(self.actual_revision_widget, 'The current revision is no descendant of main revision\n' + main_revision)
         else:
             branch_text = 'Download'
             branch_color = 'grey'
@@ -106,6 +113,7 @@ class PackageView:
         if self.branch_widget: self.branch_widget.destroy()
         if self.actual_revision_widget: self.actual_revision_widget.destroy()
         if self.branch_popup: self.branch_popup.destroy()
+        if self.revision_tooltip: self.revision_tooltip.destroy()
 
 class UI:
     def __init__(self, workspace):

@@ -53,3 +53,6 @@ class Package:
     def close(self):
         if self.is_editable():
             self.editable().disable()
+
+    def has_valid_revision(self):
+        return self.git.contains(self.main_revision())

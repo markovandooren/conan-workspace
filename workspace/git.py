@@ -25,6 +25,10 @@ class Git:
     def revision(self):
         return self.revision_of('HEAD')
 
+    def contains(self, revision):
+        completed_process = self.git_run(['merge-base', '--is-ancestor', revision, self.revision()])
+        return completed_process.returncode == 0
+
     def revision_of(self, branch_name):
         return self.git(['rev-parse', branch_name])
 
