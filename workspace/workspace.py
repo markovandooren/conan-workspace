@@ -181,7 +181,6 @@ class Workspace:
                     package_reference = PackageReference.from_string(key)
                     if (self.has_package(package_reference.name)):
                         pkg = self.package(package_reference.name)
-                        package_revision = pkg.main_revision()
                         if (pkg.main_semantic_version() ==  package_reference.semantic_version and pkg.main_revision() == package_reference.revision and pkg.main_user() == package_reference.user and pkg.main_channel() == package_reference.channel):
                             result[pkg.name] = Editable(pkg.main_reference(), value["path"], value["layout"])
         return result
