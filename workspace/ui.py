@@ -41,7 +41,7 @@ class PackageView:
 
         self.create_branch_widget()
 
-        self.actual_revision_widget = Label(self.window, font=self.ui.revision_font)
+        self.actual_revision_widget = Text(self.window, font=self.ui.revision_font, relief='flat',  width=40, height=1, borderwidth=0, bg=self.window.cget('bg'))
         self.actual_revision_widget.grid(column=2, row=self.row, sticky=W)
         self.refresh()
 
@@ -74,9 +74,10 @@ class PackageView:
                 self.workspace.download(self.name)
                 self.refresh()
             self.branch_widget = Button(self.window, font=self.name_font, justify=LEFT, command=download)
-        self.branch_widget.grid(column=1, row=self.row, sticky=EW)
+        self.branch_widget.grid(column=1, row=self.row, sticky=W)
 
     def refresh(self):
+        self.window.resizable(width=True, height=True)
         package = self.workspace.package(self.name)
 
         self.name_widget.config(text=package.name)
@@ -99,14 +100,16 @@ class PackageView:
                 revision_color = 'blue'
             else:
                 revision_color = 'red'
-                self.revision_tooltip = ToolTip(self.actual_revision_widget, 'The current revision is no descendant of main revision\n' + main_revision)
+                self.revision_tooltip = ToolTip(self.actual_revision_widget, 'The current revision is no descendant of the main revision\n' + main_revision)
         else:
             branch_text = 'Download'
             branch_color = 'grey'
             actual_revision = ''
             revision_color = 'gray'
         self.branch_widget.config(text=branch_text, fg=branch_color)
-        self.actual_revision_widget.config(text=actual_revision, fg = revision_color)
+        self.actual_revision_widget.insert(1.0, actual_revision)
+        self.actual_revision_widget.config(state=DISABLED, fg = revision_color, selectforeground = revision_color)
+        self.window.resizable(width=False, height=False)
 
     def destroy(self):
         if self.name_widget: self.name_widget.destroy()
