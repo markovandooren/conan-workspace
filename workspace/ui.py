@@ -1,6 +1,7 @@
 from tkinter import *
 import tkinter.ttk
 from tkinter import font
+from tkinter import messagebox
 from workspace.contract import *
 from workspace.workspace import *
 from workspace.tooltip import *
@@ -176,8 +177,12 @@ class UI:
                 self.refresh()
 
             def peg():
-                self.workspace.peg()
-                self.refresh()
+                try:
+                    self.workspace.peg()
+                except Exception as error:
+                    messagebox.askokcancel('Workspace Error', error, icon='warning')
+                finally:
+                    self.refresh()
 
             self.status_frame = Frame(self.window)
             self.status_frame.grid(row=row, column=0, columnspan=3, stick ='EW')

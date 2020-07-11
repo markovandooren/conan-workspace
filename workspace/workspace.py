@@ -136,6 +136,9 @@ class Workspace:
                     # Install the package again such that Conan call still work correctly for that package.
 
     def peg(self):
+        for package in self.packages():
+            if not package.has_valid_revision():
+                raise Exception('Package %s does not have a valid revision.' % package.name)
         for package_name in self.reversed_package_name_order():
             self.peg_package(package_name)
         # We install the packages again after changing all of the dependencies to
