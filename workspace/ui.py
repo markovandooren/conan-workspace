@@ -19,6 +19,8 @@ class PackageView:
         self.is_downloaded = False
         self.branch_popup = None
         self.revision_tooltip = None
+        self.editable_widget = None
+        self.editable_var = BooleanVar(False)
 
     @property
     def workspace(self):
@@ -42,8 +44,12 @@ class PackageView:
 
         self.create_branch_widget()
 
-        self.actual_revision_widget = Text(self.window, font=self.ui.revision_font, relief='flat',  width=40, height=1, borderwidth=0, bg=self.window.cget('bg'))
+        self.actual_revision_widget = Text(self.window, font=self.ui.revision_font, relief='flat',  width=41, height=1, borderwidth=0, bg=self.window.cget('bg'))
         self.actual_revision_widget.grid(column=2, row=self.row, sticky=W)
+
+        self.editable_widget = Button(self.window, image=self.ui.off_image, state=DISABLED)
+        self.editable_widget.grid(column=3, row=self.row, sticky=W)
+
         self.refresh()
 
     def create_branch_widget(self):
@@ -110,6 +116,10 @@ class PackageView:
         self.branch_widget.config(text=branch_text, fg=branch_color)
         self.actual_revision_widget.insert(1.0, actual_revision)
         self.actual_revision_widget.config(state=DISABLED, fg = revision_color, selectforeground = revision_color)
+
+        editable = package.is_editable()
+        self.editable_widget.config(image=self.ui.on_image if editable else self.ui.off_image)
+
         self.window.resizable(width=False, height=False)
 
     def destroy(self):
@@ -118,6 +128,7 @@ class PackageView:
         if self.actual_revision_widget: self.actual_revision_widget.destroy()
         if self.branch_popup: self.branch_popup.destroy()
         if self.revision_tooltip: self.revision_tooltip.destroy()
+        if self.editable_widget: self.editable_widget.destroy()
 
 class UI:
     def __init__(self, workspace):
@@ -129,6 +140,12 @@ class UI:
         self.package_views=[]
         self.number_of_packages = 0
         self.status_frame = None
+        self.on_image = tk.PhotoImage(width=48, height=24)
+        self.off_image = tk.PhotoImage(width=48, height=24)
+        self.on_image.put(self.window.cget('bg'), to=(0, 0, 47, 23))
+        self.on_image.put(("green",), to=(0, 0, 23, 23))
+        self.off_image.put(self.window.cget('bg'), to=(0, 0, 47, 23))
+        self.off_image.put(("red",), to=(24, 0, 47, 23))
 
     @property
     def workspace(self):
@@ -148,7 +165,7 @@ class UI:
         Label(self.window, text='Revision ', font=self.name_font).grid(column=2, row=row, sticky=W)
         row = row + 1
         separator = tkinter.ttk.Separator(self.window, orient=HORIZONTAL)
-        separator.grid(row=row, columnspan=3, sticky='WE')
+        separator.grid(row=row, columnspan=4, sticky='WE')
 
     def refresh(self):
         self.workspace.update_graph()
@@ -185,7 +202,7 @@ class UI:
                     self.refresh()
 
             self.status_frame = Frame(self.window)
-            self.status_frame.grid(row=row, column=0, columnspan=3, stick ='EW')
+            self.status_frame.grid(row=row, column=0, columnspan=4, stick ='EW')
             refresh_button = Button(self.status_frame,text="Refresh", command=refresh)
             refresh_button.pack(side=tkinter.RIGHT)
             peg_button = Button(self.status_frame,text="Peg", command=peg)
