@@ -164,6 +164,7 @@ class Workspace:
                     package.git.create_branch(main_branch)
             else:
                 package.git.checkout(package.main_revision())
+            subprocess.run([ 'conan', 'source', '.' ], stdout=subprocess.PIPE, cwd=package.directory())
             package.edit()
 
     def editables(self):
