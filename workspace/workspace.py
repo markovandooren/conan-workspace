@@ -150,7 +150,6 @@ class Workspace:
     def download(self, package_name):
         package = self.package(package_name)
         if not os.path.exists(os.path.join(package.directory(), ".git")):
-            package.clone()
             repo = self.git_prefix + package_name + self.git_suffix
             print("Cloning repository " + repo)
             subprocess.run(['git', 'clone', repo, package_name], stdout=subprocess.PIPE, cwd=self.root)
@@ -164,7 +163,8 @@ class Workspace:
                     package.git.create_branch(main_branch)
             else:
                 package.git.checkout(package.main_revision())
-            subprocess.run([ 'conan', 'source', '.' ], stdout=subprocess.PIPE, cwd=package.directory())
+            subprocess.run([ 'conan', 'install', '.' ], cwd=package.directory())
+            subprocess.run([ 'conan', 'source', '.' ], cwd=package.directory())
             package.edit()
 
     def editables(self):

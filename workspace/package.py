@@ -43,7 +43,7 @@ class Package:
         editables = self.workspace.editables()
         return editables[self.name] if self.name in editables else None
 
-    def edit(self, actual):
+    def edit(self, actual = False):
         if self.is_downloaded():
             ref = self.workspace.main_references[self.name]
             if actual:
