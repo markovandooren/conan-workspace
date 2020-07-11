@@ -111,7 +111,7 @@ class PackageView:
         else:
             branch_text = 'Download'
             branch_color = 'grey'
-            actual_revision = ''
+            actual_revision = package.main_revision()
             revision_color = 'gray'
         self.branch_widget.config(text=branch_text, fg=branch_color)
         self.actual_revision_widget.insert(1.0, actual_revision)
