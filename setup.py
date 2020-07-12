@@ -5,5 +5,9 @@ setuptools.setup(
     version='0.1',
     entry_points = {
         'console_scripts': ['workspace=workspace.workspace:main']},
-    packages=setuptools.find_packages()
+    packages=setuptools.find_packages(),
+    install_requires=[
+        'networkx',
+        'pyyaml',
+    ]
 )
