@@ -88,7 +88,6 @@ class PackageView:
         self.branch_widget.grid(column=1, row=self.row, sticky=W)
 
     def refresh(self):
-        self.window.resizable(width=True, height=True)
         package = self.workspace.package(self.name)
 
         self.name_widget.config(text=package.name)
@@ -123,8 +122,6 @@ class PackageView:
 
         editable = package.is_editable()
         self.editable_widget.config(image=self.ui.on_image if editable else self.ui.off_image)
-
-        self.window.resizable(width=False, height=False)
 
     def destroy(self):
         if self.name_widget: self.name_widget.destroy()
@@ -173,6 +170,7 @@ class UI:
 
     def refresh(self):
         self.workspace.update_graph()
+        self.window.resizable(width=True, height=True)
         number_of_packages = self.workspace.graph.number_of_nodes()
         if number_of_packages == self.number_of_packages:
             for package_view in self.package_views:
@@ -211,6 +209,7 @@ class UI:
             refresh_button.pack(side=tkinter.RIGHT)
             peg_button = Button(self.status_frame,text="Peg", command=peg)
             peg_button.pack(side=tkinter.RIGHT)
+        self.window.resizable(width=False, height=False)
 
     def refreshable(self, widget):
         self.refreshable_widgets.append(widget)
