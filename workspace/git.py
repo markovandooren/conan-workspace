@@ -98,5 +98,4 @@ class Git:
         return remotes
 
     def fetch(self):
-
-        self.git('fetch')
+        self.git(['fetch'])

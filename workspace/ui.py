@@ -6,6 +6,7 @@ from tkinter import simpledialog
 from workspace.contract import *
 from workspace.workspace import *
 from workspace.tooltip import *
+import threading
 import subprocess
 
 # Because of a bug in TkInter, getting the default background does not work on Windows.
@@ -155,6 +156,9 @@ class UI:
         self.off_image.put(default_background_color, to=(0, 0, 47, 23))
         self.off_image.put(("red",), to=(24, 0, 47, 23))
         self.window.resizable(width=False, height=False)
+        self.refresh_button = None
+        self.peg_button = None
+        self.fetch_button = None
 
     @property
     def workspace(self):
@@ -176,6 +180,23 @@ class UI:
         row = row + 1
         separator = tkinter.ttk.Separator(self.window, orient=HORIZONTAL)
         separator.grid(row=row, columnspan=4, sticky='WE')
+
+    def disable_mutations(self):
+        self.refresh_button.config(state=DISABLED)
+        self.peg_button.config(state=DISABLED)
+
+    def enable_mutations(self):
+        self.refresh_button.config(state=NORMAL)
+        self.peg_button.config(state=NORMAL)
+
+    def run_async(self, task):
+        def execute():
+            self.disable_mutations()
+            task()
+            self.enable_mutations()
+
+        t = threading.Thread(target=execute)
+        t.start()
 
     def refresh(self):
         self.workspace.update_graph()
@@ -201,7 +222,7 @@ class UI:
             separator.grid(row=row, columnspan=3, sticky='WE')
             row = row + 1
             def refresh():
-                self.refresh()
+                self.run_async(self.refresh)
 
             def peg():
                 try:
@@ -216,12 +237,18 @@ class UI:
                 finally:
                     self.refresh()
 
+            def fetch():
+                self.workspace.fetch()
+
             self.status_frame = Frame(self.window)
             self.status_frame.grid(row=row, column=0, columnspan=4, stick ='EW')
-            refresh_button = Button(self.status_frame,text="Refresh", command=refresh)
-            refresh_button.pack(side=tkinter.RIGHT)
-            peg_button = Button(self.status_frame,text="Peg", command=peg)
-            peg_button.pack(side=tkinter.RIGHT)
+            self.refresh_button = Button(self.status_frame,text="Refresh", command=refresh)
+            self.refresh_button.pack(side=tkinter.RIGHT)
+            self.peg_button = Button(self.status_frame,text="Peg", command=peg)
+            self.peg_button.pack(side=tkinter.RIGHT)
+            self.fetch_button = Button(self.status_frame,text="Fetch", command=fetch)
+            self.fetch_button.pack(side=tkinter.RIGHT)
+            #row = row + 1
 
     def refreshable(self, widget):
         self.refreshable_widgets.append(widget)

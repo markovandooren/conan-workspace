@@ -139,6 +139,9 @@ class Workspace:
         if commit_message and len(commit_message) == 0:
             commit_message = None
         packages = self.packages()
+        # The packages will update their editables before install is ran on the main package.
+        # That means that we have to check for editability beforehand. Otherwise, we can't figure
+        # out on which packages to run conan install afterwards.
         editable_packages_names = [package.name for package in packages if package.is_downloaded() and package.is_editable()]
         for package in packages:
             if package.is_editable() and not package.has_valid_revision():
@@ -178,6 +181,11 @@ class Workspace:
             subprocess.run([ 'conan', 'install', '.' ], cwd=package.directory())
             subprocess.run([ 'conan', 'source', '.' ], cwd=package.directory())
             package.edit()
+
+    def fetch(self):
+        for package in self.packages():
+            if package.is_downloaded() and package.is_editable():
+                package.git.fetch()
 
     def editables(self):
         """ Return the editables of this workspace. """
