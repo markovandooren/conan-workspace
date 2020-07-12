@@ -7,6 +7,10 @@ from workspace.workspace import *
 from workspace.tooltip import *
 import subprocess
 
+# Because of a bug in TkInter, getting the default background does not work on Windows.
+# It cannot resolve the color SystemButtonFace.
+default_background_color = 'gray85'
+
 class PackageView:
     def __init__(self, ui, name, row):
         self.ui = ui
@@ -44,7 +48,7 @@ class PackageView:
 
         self.create_branch_widget()
 
-        self.actual_revision_widget = Text(self.window, font=self.ui.revision_font, relief='flat',  width=41, height=1, borderwidth=0, bg=self.window.cget('bg'))
+        self.actual_revision_widget = Text(self.window, font=self.ui.revision_font, relief='flat',  width=41, height=1, borderwidth=0, bg=default_background_color)
         self.actual_revision_widget.grid(column=2, row=self.row, sticky=W)
 
         self.editable_widget = Button(self.window, image=self.ui.off_image, state=DISABLED)
@@ -142,9 +146,9 @@ class UI:
         self.status_frame = None
         self.on_image = tk.PhotoImage(width=48, height=24)
         self.off_image = tk.PhotoImage(width=48, height=24)
-        self.on_image.put(self.window.cget('bg'), to=(0, 0, 47, 23))
+        self.on_image.put(default_background_color, to=(0, 0, 47, 23))
         self.on_image.put(("green",), to=(0, 0, 23, 23))
-        self.off_image.put(self.window.cget('bg'), to=(0, 0, 47, 23))
+        self.off_image.put(default_background_color, to=(0, 0, 47, 23))
         self.off_image.put(("red",), to=(24, 0, 47, 23))
 
     @property
