@@ -147,6 +147,7 @@ class UI:
         self.on_image.put(("green",), to=(0, 0, 23, 23))
         self.off_image.put(default_background_color, to=(0, 0, 47, 23))
         self.off_image.put(("red",), to=(24, 0, 47, 23))
+        self.window.resizable(width=False, height=False)
 
     @property
     def workspace(self):
@@ -170,7 +171,6 @@ class UI:
 
     def refresh(self):
         self.workspace.update_graph()
-        self.window.resizable(width=True, height=True)
         number_of_packages = self.workspace.graph.number_of_nodes()
         if number_of_packages == self.number_of_packages:
             for package_view in self.package_views:
@@ -209,7 +209,6 @@ class UI:
             refresh_button.pack(side=tkinter.RIGHT)
             peg_button = Button(self.status_frame,text="Peg", command=peg)
             peg_button.pack(side=tkinter.RIGHT)
-        self.window.resizable(width=False, height=False)
 
     def refreshable(self, widget):
         self.refreshable_widgets.append(widget)
