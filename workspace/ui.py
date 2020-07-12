@@ -144,11 +144,11 @@ class UI:
         require(workspace)
         self._workspace = workspace
         self.window = Tk()
-        self.create_header()
+
+        self.mutate_widgets = []
         self.refreshable_widgets = []
         self.package_views=[]
         self.number_of_packages = 0
-        self.status_frame = None
         self.on_image = tk.PhotoImage(width=48, height=24)
         self.off_image = tk.PhotoImage(width=48, height=24)
         self.on_image.put(default_background_color, to=(0, 0, 47, 23))
@@ -156,9 +156,9 @@ class UI:
         self.off_image.put(default_background_color, to=(0, 0, 47, 23))
         self.off_image.put(("red",), to=(24, 0, 47, 23))
         self.window.resizable(width=False, height=False)
-        self.refresh_button = None
-        self.peg_button = None
-        self.fetch_button = None
+        self.is_processing = False
+        self.create_header()
+        self.create_footer()
 
     @property
     def workspace(self):
@@ -177,26 +177,62 @@ class UI:
         Label(self.window, text='Name ', font=self.name_font).grid(column=0, row=row, sticky=W)
         Label(self.window, text='Branch ', font=self.name_font).grid(column=1, row=row, sticky=W)
         Label(self.window, text='Revision ', font=self.name_font).grid(column=2, row=row, sticky=W)
+        Label(self.window, text='Edit ', font=self.name_font).grid(column=3, row=row, sticky=W)
         row = row + 1
         separator = tkinter.ttk.Separator(self.window, orient=HORIZONTAL)
         separator.grid(row=row, columnspan=4, sticky='WE')
 
+    def create_footer(self):
+        def refresh():
+            self.run_async(self.refresh)
+
+        def peg():
+            try:
+                dirty_packages = [package.name for package in self.workspace.packages() if package.git.is_dirty()]
+                commit_message = None
+                if len(dirty_packages) > 0:
+                    commit_message = simpledialog.askstring('Commit message', 'Packages ' + ', '.join(
+                        dirty_packages) + ' are dirty. Enter a commit message.')
+
+                self.workspace.peg(commit_message)
+            except Exception as error:
+                messagebox.showerror('Workspace Error', error, icon='warning')
+            finally:
+                self.refresh()
+
+        def fetch():
+            self.run_async(self.workspace.fetch)
+
+        def push():
+            self.run_async(self.workspace.push)
+
+        self.status_frame = Frame(self.window)
+        self.add_button(Button(self.status_frame, text="Refresh", command=refresh))
+        self.add_button(Button(self.status_frame, text="Peg", command=peg))
+        self.add_button(Button(self.status_frame, text="Fetch", command=fetch))
+        self.add_button(Button(self.status_frame, text="Push", command=push))
+
+    def add_button(self, button):
+        button.pack(side=tkinter.RIGHT)
+        self.mutate_widgets.append(button)
+
     def disable_mutations(self):
-        self.refresh_button.config(state=DISABLED)
-        self.peg_button.config(state=DISABLED)
+        for widget in self.mutate_widgets:
+            widget.config(state=DISABLED)
 
     def enable_mutations(self):
-        self.refresh_button.config(state=NORMAL)
-        self.peg_button.config(state=NORMAL)
+        for widget in self.mutate_widgets:
+            widget.config(state=NORMAL)
 
     def run_async(self, task):
-        def execute():
-            self.disable_mutations()
-            task()
-            self.enable_mutations()
+        if not self.is_processing:
+            self.is_processing = True
+            def execute():
+                task()
+                self.is_processing = False
 
-        t = threading.Thread(target=execute)
-        t.start()
+            t = threading.Thread(target=execute)
+            t.start()
 
     def refresh(self):
         self.workspace.update_graph()
@@ -221,34 +257,8 @@ class UI:
             separator = tkinter.ttk.Separator(self.window, orient=HORIZONTAL)
             separator.grid(row=row, columnspan=3, sticky='WE')
             row = row + 1
-            def refresh():
-                self.run_async(self.refresh)
-
-            def peg():
-                try:
-                    dirty_packages = [package.name for package in self.workspace.packages() if package.git.is_dirty()]
-                    commit_message = None
-                    if len(dirty_packages) > 0:
-                        commit_message = simpledialog.askstring('Commit message', 'Packages ' + ', '.join(dirty_packages) + ' are dirty. Enter a commit message.')
-
-                    self.workspace.peg(commit_message)
-                except Exception as error:
-                    messagebox.showerror('Workspace Error', error, icon='warning')
-                finally:
-                    self.refresh()
-
-            def fetch():
-                self.workspace.fetch()
-
-            self.status_frame = Frame(self.window)
             self.status_frame.grid(row=row, column=0, columnspan=4, stick ='EW')
-            self.refresh_button = Button(self.status_frame,text="Refresh", command=refresh)
-            self.refresh_button.pack(side=tkinter.RIGHT)
-            self.peg_button = Button(self.status_frame,text="Peg", command=peg)
-            self.peg_button.pack(side=tkinter.RIGHT)
-            self.fetch_button = Button(self.status_frame,text="Fetch", command=fetch)
-            self.fetch_button.pack(side=tkinter.RIGHT)
-            #row = row + 1
+
 
     def refreshable(self, widget):
         self.refreshable_widgets.append(widget)

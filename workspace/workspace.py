@@ -187,6 +187,12 @@ class Workspace:
             if package.is_downloaded() and package.is_editable():
                 package.git.fetch()
 
+    def push(self):
+        for package in self.packages():
+            if package.is_downloaded() and package.is_editable():
+                package.git.push()
+
+
     def editables(self):
         """ Return the editables of this workspace. """
         result = {}

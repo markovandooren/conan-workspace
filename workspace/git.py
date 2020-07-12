@@ -99,3 +99,6 @@ class Git:
 
     def fetch(self):
         self.git(['fetch'])
+
+    def push(self):
+        self.git(['push'])
