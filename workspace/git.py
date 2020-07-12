@@ -29,6 +29,10 @@ class Git:
         completed_process = self.git_run(['merge-base', '--is-ancestor', revision, self.revision()])
         return completed_process.returncode == 0
 
+    def is_dirty(self):
+        completed_process = self.git_run(['diff', '--quiet', 'HEAD'])
+        return completed_process.returncode != 0
+
     def revision_of(self, branch_name):
         return self.git(['rev-parse', branch_name])
 

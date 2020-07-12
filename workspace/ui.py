@@ -97,6 +97,8 @@ class PackageView:
             self.is_downloaded = is_downloaded
             self.create_branch_widget()
 
+        revision_font = self.ui.revision_font
+
         if is_downloaded:
             branch = package.git.branch()
             branch_text = branch + ' ' if branch else 'no branch '
@@ -111,12 +113,16 @@ class PackageView:
             else:
                 revision_color = 'red'
                 self.revision_tooltip = ToolTip(self.actual_revision_widget, 'The current revision is no descendant of the main revision\n' + main_revision)
+
+            if package.git.is_dirty():
+                revision_font = self.ui.revision_font_dirty
         else:
             branch_text = 'Download'
             branch_color = 'grey'
             actual_revision = package.main_revision()
             revision_color = 'gray'
         self.branch_widget.config(text=branch_text, fg=branch_color)
+        self.actual_revision_widget.config(font=revision_font)
         self.actual_revision_widget.insert(1.0, actual_revision)
         self.actual_revision_widget.config(state=DISABLED, fg = revision_color, selectforeground = revision_color)
 
@@ -161,6 +167,7 @@ class UI:
     def create_header(self):
         self.name_font = font.Font(family='Courier', size=12, weight=font.BOLD)
         self.revision_font = font.Font(family='Courier', weight=font.BOLD, size=12)
+        self.revision_font_dirty = font.Font(family='Courier', weight=font.BOLD, slant=font.ITALIC, size=12)
         row = 0
         Label(self.window, text='Name ', font=self.name_font).grid(column=0, row=row, sticky=W)
         Label(self.window, text='Branch ', font=self.name_font).grid(column=1, row=row, sticky=W)
