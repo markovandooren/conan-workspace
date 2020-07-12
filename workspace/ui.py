@@ -2,6 +2,7 @@ from tkinter import *
 import tkinter.ttk
 from tkinter import font
 from tkinter import messagebox
+from tkinter import simpledialog
 from workspace.contract import *
 from workspace.workspace import *
 from workspace.tooltip import *
@@ -204,9 +205,14 @@ class UI:
 
             def peg():
                 try:
-                    self.workspace.peg()
+                    dirty_packages = [package.name for package in self.workspace.packages() if package.git.is_dirty()]
+                    commit_message = None
+                    if len(dirty_packages) > 0:
+                        commit_message = simpledialog.askstring('Commit message', 'Packages ' + ', '.join(dirty_packages) + ' are dirty. Enter a commit message.')
+
+                    self.workspace.peg(commit_message)
                 except Exception as error:
-                    messagebox.askokcancel('Workspace Error', error, icon='warning')
+                    messagebox.showerror('Workspace Error', error, icon='warning')
                 finally:
                     self.refresh()
 

@@ -105,13 +105,13 @@ class Workspace:
         for package in self.packages():
             package.edit(actual)
 
-    def peg_package(self, package_name):
+    def peg_package(self, package_name, commit_message = None):
         package = self.package(package_name)
         if package.is_downloaded() and package.is_editable():
             import fileinput
 
             # Commit the package and obtain the new revision.
-            hash = package.commit()
+            hash = package.commit(commit_message)
             sequence_in_branch = package.git.sequence_in_branch()
             # Remove the editable for the old revision.
             editable = package.editable()
@@ -135,17 +135,26 @@ class Workspace:
                         print(newcontent, end="")
                     # Install the package again such that Conan call still work correctly for that package.
 
-    def peg(self):
-        for package in self.packages():
+    def peg(self, commit_message = None):
+        if commit_message and len(commit_message) == 0:
+            commit_message = None
+        packages = self.packages()
+        editable_packages_names = [package.name for package in packages if package.is_downloaded() and package.is_editable()]
+        for package in packages:
             if package.is_editable() and not package.has_valid_revision():
                 raise Exception('Package %s does not have a valid revision.' % package.name)
+        if not commit_message:
+            for package in packages:
+                if package.git.is_dirty():
+                    raise Exception('Package %s has local changes. Peg is not allowed without a commit message.' % package.name)
+
         for package_name in self.reversed_package_name_order():
-            self.peg_package(package_name)
+            self.peg_package(package_name, commit_message if package.git.is_dirty() else None)
         # We install the packages again after changing all of the dependencies to
         # avoid doing it a quadratic number of times.
         for package_name in self.reversed_package_name_order():
             package = self.package(package_name)
-            if package.is_downloaded() and package.is_editable():
+            if package_name in editable_packages_names:
                 subprocess.run(['conan', 'install', '.'], cwd=package.directory())
         # In case the workspace object is kept alive, we update the graph.
         self.update_graph()

@@ -12,10 +12,9 @@ class Package:
     def directory(self):
         return os.path.join(self.workspace.root, self.name)
 
-    def commit(self):
-        directory = self.directory()
+    def commit(self, commit_message = None):
         self.git.add('conanfile.py')
-        self.git.commit('Update bump')
+        self.git.commit('Requirements version bump' if not commit_message else commit_message)
         return self.git.revision()
 
     def main_semantic_version(self):
