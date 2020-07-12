@@ -188,13 +188,22 @@ class UI:
 
         def peg():
             try:
-                dirty_packages = [package.name for package in self.workspace.packages() if package.git.is_dirty()]
+                dirty_package_names = [package.name for package in self.workspace.packages() if package.git.is_dirty()]
                 commit_message = None
-                if len(dirty_packages) > 0:
+                if len(dirty_package_names) > 0:
                     commit_message = simpledialog.askstring('Commit message', 'Packages ' + ', '.join(
-                        dirty_packages) + ' are dirty. Enter a commit message.')
+                        dirty_package_names) + ' are dirty. Enter a commit message.')
 
                 self.workspace.peg(commit_message)
+            except Exception as error:
+                messagebox.showerror('Workspace Error', error, icon='warning')
+            finally:
+                self.refresh()
+
+        def create_branch():
+            try:
+                branch_name = simpledialog.askstring('Branch', 'Enter the branch name.')
+                self.workspace.create_branch(branch_name)
             except Exception as error:
                 messagebox.showerror('Workspace Error', error, icon='warning')
             finally:
@@ -204,13 +213,19 @@ class UI:
             self.run_async(self.workspace.fetch)
 
         def push():
-            self.run_async(self.workspace.push)
+            package_names_without_remotes = [package.name for package in self.workspace.editable_packages() if not package.git.has_remote()]
+            do_push = True
+            if len(package_names_without_remotes) > 0:
+                do_push = messagebox.askokcancel('Push', 'Packages %s have no remote set. Continue with push?' % ', '.join(package_names_without_remotes), icon='warning')
+            if do_push:
+                self.run_async(self.workspace.push)
 
         self.status_frame = Frame(self.window)
         self.add_button(Button(self.status_frame, text="Refresh", command=refresh))
         self.add_button(Button(self.status_frame, text="Peg", command=peg))
         self.add_button(Button(self.status_frame, text="Fetch", command=fetch))
         self.add_button(Button(self.status_frame, text="Push", command=push))
+        self.add_button(Button(self.status_frame, text="Branch", command=create_branch))
 
     def add_button(self, button):
         button.pack(side=tkinter.RIGHT)

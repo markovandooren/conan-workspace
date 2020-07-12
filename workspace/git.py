@@ -77,6 +77,14 @@ class Git:
         result = [branch[21:-1] for branch in remote_branches if branch != 'refs/remotes/origin/HEAD']
         return result
 
+    def remotes(self):
+        remotes = self.git(['remote']).split('\n')
+        result = [remote for remote in remotes if remote and len(remote) > 0]
+        return remotes
+
+    def has_remote(self):
+        return len(self.remotes()) > 0
+
     def create_branch(self, name):
         self.git(['checkout', '-b', name])
 

@@ -192,6 +192,13 @@ class Workspace:
             if package.is_downloaded() and package.is_editable():
                 package.git.push()
 
+    def create_branch(self, branch_name):
+        for package in self.packages():
+            if package.is_downloaded() and package.is_editable():
+                package.git.create_branch(branch_name)
+
+    def editable_packages(self):
+        return [self.package(name) for name in self.editables()]
 
     def editables(self):
         """ Return the editables of this workspace. """
