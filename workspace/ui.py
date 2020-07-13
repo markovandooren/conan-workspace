@@ -124,7 +124,8 @@ class PackageView:
             actual_revision = package.main_revision()
             revision_color = 'gray'
         self.branch_widget.config(text=branch_text, fg=branch_color)
-        self.actual_revision_widget.config(font=revision_font)
+        self.actual_revision_widget.config(state=NORMAL, font=revision_font)
+        self.actual_revision_widget.delete(1.0, END)
         self.actual_revision_widget.insert(1.0, actual_revision)
         self.actual_revision_widget.config(state=DISABLED, fg = revision_color, selectforeground = revision_color)
 
