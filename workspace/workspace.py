@@ -236,6 +236,7 @@ def main():
     parser_list.add_argument('--revision', action="store_true")
     parser_list.add_argument('--branch', action="store_true")
     parser_list.add_argument('--branches', action="store_true")
+    parser_list.add_argument('--remote-branches', action="store_true")
     parser_list.add_argument('--upstream', action="store_true")
     parser_list.add_argument('--remotes', action="store_true")
 
@@ -268,29 +269,27 @@ def main():
             reference_string = package.main_reference().to_string()
             msg = reference_string
 
-            if (args.revision):
+            if args.revision:
                 sequence_in_branch = package.git.sequence_in_branch()
                 revision_string = package.git.revision()
                 msg = msg + " : " + str(sequence_in_branch) + ' : ' + revision_string
-            if (args.branch and not args.branches):
+            if args.branch and not args.branches:
                 branch_name = package.git.branch()
-                if (branch_name):
+                if branch_name:
                     msg = msg + " : " + branch_name
                 else:
                     msg = msg + " is detached"
-            if (args.branches):
-                branches = package.git.current_branches()
-                if len(branches) == 0:
-                    msg = msg + " is detached"
-                else:
-                    msg = msg + " : " + (", ".join(branches))
-            if (args.upstream):
+            if args.branches:
+                msg = append_branches_message(package.git.current_branches(), msg)
+            if args.remote_branches:
+                msg = append_branches_message(package.git.remote_branches(), msg)
+            if args.upstream:
                 upstream_branch_name = package.git.upstream_branch()
                 if (upstream_branch_name):
                     msg = msg + " : " + upstream_branch_name
                 else:
                     msg = msg + " has no upstream branch"
-            if (args.remotes):
+            if args.remotes:
                 remotes = package.git.remotes()
                 msg = msg + " : " + (". ".join(remotes))
 
@@ -306,13 +305,20 @@ def main():
         ui = UI(workspace)
         ui.run()
 
+def append_branches_message(branches, msg):
+    if len(branches) == 0:
+        result = msg + ' is detached'
+    else:
+        result = msg + ' : ' + (', '.join(branches))
+    return result
+
 class PackageDescriptor:
     def __init__(self, value):
         if ("requires" in value):
             self.deps = value["requires"]
         else:
             self.deps = []
-        self.package_reference = PackageReference.from_string(value["pref"])
+        self.package_reference = PackageReference.from_string(value["ref"])
 
     @property
     def name(self):

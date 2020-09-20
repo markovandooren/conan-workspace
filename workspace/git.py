@@ -19,15 +19,15 @@ class Git:
     def commit(self, message):
         self.git(['commit', '-m', message])
 
-    def push(self):
-        self.git(['push'])
-
     def revision(self):
         return self.revision_of('HEAD')
 
-    def contains(self, revision):
-        completed_process = self.git_run(['merge-base', '--is-ancestor', revision, self.revision()])
+    def is_ancestor(self, potential_ancestor, commit):
+        completed_process = self.git_run(['merge-base', '--is-ancestor', potential_ancestor, commit])
         return completed_process.returncode == 0
+
+    def contains(self, revision):
+        return self.is_ancestor(revision, self.revision())
 
     def is_dirty(self):
         completed_process = self.git_run(['diff', '--quiet', 'HEAD'])
@@ -38,7 +38,7 @@ class Git:
 
     def branch(self):
         branch = self.git(['rev-parse', '--symbolic-full-name', '--abbrev-ref', 'HEAD'])
-        if (branch == 'HEAD'):
+        if branch == 'HEAD':
             return None
         else:
             return branch
@@ -49,7 +49,7 @@ class Git:
         Note that this number is unique only within a certain branch.
         :return: The number of commits from HEAD until the first commit of the repository.
         """
-        sequence_in_branch_string = self.git(['rev-list', '--count', 'HEAD'])
+        sequence_in_branch_string = self.git(['rev-list', '--count', '--first-parent', 'HEAD'])
         return int(sequence_in_branch_string)
 
     def current_branches(self):
@@ -72,15 +72,44 @@ class Git:
         result = [branch[12:-1] for branch in local_branches if branch.startswith('"refs/heads/')]
         return result
 
-    def remote_branches(self):
+    def full_remote_branches(self):
         remote_branches = self.git(['branch', '--list', '--remotes', '--format="%(refname)"']).split('\n')
-        result = [branch[21:-1] for branch in remote_branches if branch != 'refs/remotes/origin/HEAD']
+        result = [branch for branch in remote_branches if branch != 'refs/remotes/origin/HEAD']
         return result
 
+    def full_remote_branch_of(self, branch_name):
+        return 'refs/remotes/origin/' + branch_name
+
+    def remote_branches(self):
+        result = [branch[21:-1] for branch in self.full_remote_branches()]
+        return result
+
+    def remote_branches_containing(self, commit):
+        dictionary = {branch:self.revision_of(self.full_remote_branch_of(branch)) for branch in self.remote_branches()}
+        return {branch: revision for branch, revision in dictionary if self.is_ancestor(commit, revision)}
+
+    def most_stable_remote_branch_containing(self, commit):
+        """
+        Return the short name of the most stable branch that contains the given commit
+        and its revision.
+        """
+        dictionary = self.remote_branches_containing(commit)
+
+        most_stable_branch = None
+        most_stable_revision = None
+        for branch, revision in dictionary:
+            if not most_stable_revision or self.is_ancestor(most_stable_revision, revision):
+                most_stable_revision = revision
+                most_stable_branch = branch
+        return most_stable_branch, most_stable_revision
+
     def remotes(self):
+        """
+        Return the remotes.
+        """
         remotes = self.git(['remote']).split('\n')
         result = [remote for remote in remotes if remote and len(remote) > 0]
-        return remotes
+        return result
 
     def has_remote(self):
         return len(self.remotes()) > 0
@@ -91,22 +120,29 @@ class Git:
     def checkout_branch(self, name):
         self.git(['checkout', name])
 
+    def force_create_branch(self, name, revision):
+        """
+        Force create a branch with the given name at the given revision.
+        Set the upstream if there is a matching branch.
+        """
+        self.get(['branch', '-f', '-b', name, revision])
+        self.checkout_branch(name)
+        if name in self.remote_branches():
+            self.set_upstream()
+
     def push(self):
         if self.upstream_branch():
             self.git(['push'])
         else:
-            self.git(['branch', '--set-upstream', 'origin', self.branch()])
+            self.set_upstream()
+            self.git(['push'])
+
+    def set_upstream(self):
+        self.git(['branch', '--set-upstream', 'origin', self.branch()])
 
     def checkout(self, revision):
         self.git(['checkout', revision])
 
-    def remotes(self):
-        out = self.git(['remote'])
-        remotes = out.split('\n') if len(out) > 0 else []
-        return remotes
-
     def fetch(self):
         self.git(['fetch'])
 
-    def push(self):
-        self.git(['push'])

@@ -53,8 +53,13 @@ class PackageView:
         self.actual_revision_widget = Text(self.window, font=self.ui.revision_font, relief='flat',  width=41, height=1, borderwidth=0, bg=default_background_color)
         self.actual_revision_widget.grid(column=2, row=self.row, sticky=W)
 
-        self.editable_widget = Button(self.window, image=self.ui.off_image, state=DISABLED)
+        def toggle_editable():
+            self.package.toggle_editable()
+            self.refresh_editable()
+
+        self.editable_widget = Button(self.window, image=self.ui.off_image, command=toggle_editable)
         self.editable_widget.grid(column=3, row=self.row, sticky=W)
+
 
         self.refresh()
 
@@ -90,7 +95,7 @@ class PackageView:
         self.branch_widget.grid(column=1, row=self.row, sticky=W)
 
     def refresh(self):
-        package = self.workspace.package(self.name)
+        package = self.package
 
         self.name_widget.config(text=package.name)
 
@@ -108,16 +113,21 @@ class PackageView:
 
             main_revision = package.main_revision()
             actual_revision = package.git.revision()
+            tooltip = ''
             if main_revision == actual_revision:
                 revision_color = 'green'
+                tooltip = f'The current revision is equal to main revision\n' + main_revision
             elif package.has_valid_revision():
                 revision_color = 'blue'
+                tooltip = f'The current revision is ahead of the main revision\n' + main_revision
             else:
                 revision_color = 'red'
-                self.revision_tooltip = ToolTip(self.actual_revision_widget, 'The current revision is no descendant of the main revision\n' + main_revision)
+                tooltip = 'The current revision is no descendant of the main revision\n' + main_revision
 
             if package.git.is_dirty():
                 revision_font = self.ui.revision_font_dirty
+                tooltip = tooltip + '\n' + 'The package has local changes.'
+            self.revision_tooltip = ToolTip(self.actual_revision_widget, tooltip)
         else:
             branch_text = 'Download'
             branch_color = 'grey'
@@ -129,8 +139,13 @@ class PackageView:
         self.actual_revision_widget.insert(1.0, actual_revision)
         self.actual_revision_widget.config(state=DISABLED, fg = revision_color, selectforeground = revision_color)
 
-        editable = package.is_editable()
+        self.refresh_editable()
+
+
+    def refresh_editable(self):
+        editable = self.package.is_editable()
         self.editable_widget.config(image=self.ui.on_image if editable else self.ui.off_image)
+
 
     def destroy(self):
         if self.name_widget: self.name_widget.destroy()

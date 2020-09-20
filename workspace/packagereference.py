@@ -65,6 +65,9 @@ class PackageReference:
     def channel(self):
         return self._channel
 
+    def __str__(self):
+        return self.to_string()
+
     def to_string(self) -> str:
         result = self.name + '/' +self.semantic_version + '.' + str(self.sequence_in_branch) + '.' +  self.revision
         if (self.user):
